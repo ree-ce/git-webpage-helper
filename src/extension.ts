@@ -1,10 +1,10 @@
 import * as vscode from 'vscode';
 import * as cp from 'child_process';
 import * as path from 'path';
-import { URL } from 'url';
+import { generateUrl } from './url-generator';
 
 export function activate(context: vscode.ExtensionContext) {
-    // 註冊命令：在網頁上打開文件
+    // Register command: Open file on web
     const openFileOnWeb = vscode.commands.registerCommand('git-helper.openFileOnWeb', async () => {
         try {
             const editor = vscode.window.activeTextEditor;
@@ -16,28 +16,28 @@ export function activate(context: vscode.ExtensionContext) {
             const filePath = editor.document.uri.fsPath;
             const selection = editor.selection;
             
-            // 獲取 Git 存儲庫信息
+            // Get Git repository information
             const repoInfo = await getGitRepoInfo(filePath);
             if (!repoInfo) {
                 vscode.window.showErrorMessage('Failed to get repository information');
                 return;
             }
             
-            // 構建網頁 URL
+            // Build web URL
             const webUrl = buildWebUrl(repoInfo, filePath, selection);
             if (!webUrl) {
                 vscode.window.showErrorMessage('Could not determine web URL for this repository');
                 return;
             }
             
-            // 打開瀏覽器
+            // Open browser
             vscode.env.openExternal(vscode.Uri.parse(webUrl));
         } catch (error) {
             vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
         }
     });
 
-    // 註冊命令：在網頁上打開分支
+    // Register command: Open branch on web
     const openBranchOnWeb = vscode.commands.registerCommand('git-helper.openBranchOnWeb', async () => {
         try {
             const editor = vscode.window.activeTextEditor;
@@ -47,51 +47,137 @@ export function activate(context: vscode.ExtensionContext) {
             }
 
             const filePath = editor.document.uri.fsPath;
+            const dirPath = path.dirname(filePath);
             
-            // 獲取 Git 存儲庫信息
+            // Get Git repository information
+            const repoInfo = await getGitRepoInfo(filePath);
+            if (!repoInfo) {
+                vscode.window.showErrorMessage('Failed to get repository information');
+                return;
+            }
+
+            // Get branch selection
+            const selectedBranch = await getBranchSelection(dirPath);
+            if (!selectedBranch) {
+                return; // User cancelled the selection
+            }
+            
+            // Build branch web URL
+            const webUrl = buildBranchWebUrl(repoInfo, selectedBranch);
+            if (!webUrl) {
+                vscode.window.showErrorMessage('Could not determine web URL for this repository');
+                return;
+            }
+            
+            // Open browser
+            vscode.env.openExternal(vscode.Uri.parse(webUrl));
+        } catch (error) {
+            vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    });
+    
+    // Register command: Copy file URL to clipboard
+    const copyFileUrlToClipboard = vscode.commands.registerCommand('git-helper.copyFileUrlToClipboard', async () => {
+        try {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showErrorMessage('No active editor found');
+                return;
+            }
+
+            const filePath = editor.document.uri.fsPath;
+            const selection = editor.selection;
+            
+            // Get Git repository information
             const repoInfo = await getGitRepoInfo(filePath);
             if (!repoInfo) {
                 vscode.window.showErrorMessage('Failed to get repository information');
                 return;
             }
             
-            // 構建分支網頁 URL
-            const webUrl = buildBranchWebUrl(repoInfo);
+            // Build web URL
+            const webUrl = buildWebUrl(repoInfo, filePath, selection);
             if (!webUrl) {
                 vscode.window.showErrorMessage('Could not determine web URL for this repository');
                 return;
             }
             
-            // 打開瀏覽器
-            vscode.env.openExternal(vscode.Uri.parse(webUrl));
+            // Copy to clipboard
+            await vscode.env.clipboard.writeText(webUrl);
+            vscode.window.showInformationMessage('URL copied to clipboard!');
+        } catch (error) {
+            vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
+        }
+    });
+    
+    // Register command: Copy branch URL to clipboard
+    const copyBranchUrlToClipboard = vscode.commands.registerCommand('git-helper.copyBranchUrlToClipboard', async () => {
+        try {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showErrorMessage('No active editor found');
+                return;
+            }
+
+            const filePath = editor.document.uri.fsPath;
+            const dirPath = path.dirname(filePath);
+            
+            // Get Git repository information
+            const repoInfo = await getGitRepoInfo(filePath);
+            if (!repoInfo) {
+                vscode.window.showErrorMessage('Failed to get repository information');
+                return;
+            }
+
+            // Get branch selection
+            const selectedBranch = await getBranchSelection(dirPath);
+            if (!selectedBranch) {
+                return; // User cancelled the selection
+            }
+            
+            // Build branch web URL
+            const webUrl = buildBranchWebUrl(repoInfo, selectedBranch);
+            if (!webUrl) {
+                vscode.window.showErrorMessage('Could not determine web URL for this repository');
+                return;
+            }
+            
+            // Copy to clipboard
+            await vscode.env.clipboard.writeText(webUrl);
+            vscode.window.showInformationMessage('Branch URL copied to clipboard!');
         } catch (error) {
             vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
         }
     });
 
-    context.subscriptions.push(openFileOnWeb, openBranchOnWeb);
+    context.subscriptions.push(
+        openFileOnWeb, 
+        openBranchOnWeb, 
+        copyFileUrlToClipboard, 
+        copyBranchUrlToClipboard
+    );
 }
 
-// 獲取 Git 存儲庫信息
+// Get Git repository information
 async function getGitRepoInfo(filePath: string) {
     try {
         const dirPath = path.dirname(filePath);
         
-        // 獲取遠程倉庫 URL
+        // Get remote repository URL
         const remoteUrlCmd = await execCommand('git config --get remote.origin.url', dirPath);
         if (!remoteUrlCmd.success) {
             return null;
         }
         const remoteUrl = remoteUrlCmd.stdout.trim();
         
-        // 獲取當前分支
+        // Get current branch
         const branchCmd = await execCommand('git rev-parse --abbrev-ref HEAD', dirPath);
         if (!branchCmd.success) {
             return null;
         }
         const branch = branchCmd.stdout.trim();
         
-        // 獲取相對於倉庫根目錄的文件路徑
+        // Get file path relative to repository root
         const repoRootCmd = await execCommand('git rev-parse --show-toplevel', dirPath);
         if (!repoRootCmd.success) {
             return null;
@@ -106,7 +192,7 @@ async function getGitRepoInfo(filePath: string) {
     }
 }
 
-// 執行命令並獲取輸出
+// Execute command and get output
 function execCommand(command: string, cwd: string): Promise<{success: boolean, stdout: string, stderr: string}> {
     return new Promise((resolve) => {
         cp.exec(command, { cwd }, (error, stdout, stderr) => {
@@ -119,51 +205,56 @@ function execCommand(command: string, cwd: string): Promise<{success: boolean, s
     });
 }
 
-// 構建網頁 URL
+// Add this new function after getGitRepoInfo
+async function getBranchSelection(dirPath: string): Promise<string | undefined> {
+    const branchesCmd = await execCommand('git branch', dirPath);
+    if (!branchesCmd.success) {
+        throw new Error('Failed to get branches');
+    }
+
+    const branches = branchesCmd.stdout
+        .split('\n')
+        .map(b => b.trim())
+        .filter(b => b)
+        .map(b => b.startsWith('*') ? b.substring(1).trim() : b);
+
+    return vscode.window.showQuickPick(branches, {
+        placeHolder: 'Select a branch'
+    });
+}
+
+// Build web URL
 function buildWebUrl(repoInfo: {remoteUrl: string, branch: string, relativePath: string}, filePath: string, selection: vscode.Selection) {
     const { remoteUrl, branch, relativePath } = repoInfo;
     
-    // 處理 GitHub URLs
-    if (remoteUrl.includes('github.com')) {
-        const baseUrl = remoteUrl
-            .replace(/\.git$/, '')
-            .replace(/^git@github\.com:/, 'https://github.com/')
-            .replace(/^https:\/\/.*?@github\.com\//, 'https://github.com/');
-        
-        let url = `${baseUrl}/blob/${branch}/${relativePath}`;
-        
-        // 添加行號選擇
-        if (!selection.isEmpty) {
-            const start = selection.start.line + 1;
-            const end = selection.end.line + 1;
-            url += start === end ? `#L${start}` : `#L${start}-L${end}`;
+    let lineStart, lineEnd;
+    if (!selection.isEmpty) {
+        lineStart = selection.start.line + 1;
+        lineEnd = selection.end.line + 1;
+        if (lineStart === lineEnd) {
+            lineEnd = undefined;
         }
-        
-        return url;
     }
     
-    // 這裡可以添加對其他 Git 服務例如 GitLab、Bitbucket 的支持
-    
-    return null;
+    return generateUrl({
+        remoteUrl,
+        branch,
+        filePath: relativePath,
+        lineStart,
+        lineEnd
+    });
 }
 
-// 構建分支網頁 URL
-function buildBranchWebUrl(repoInfo: {remoteUrl: string, branch: string}) {
-    const { remoteUrl, branch } = repoInfo;
-    
-    // 處理 GitHub URLs
-    if (remoteUrl.includes('github.com')) {
-        const baseUrl = remoteUrl
-            .replace(/\.git$/, '')
-            .replace(/^git@github\.com:/, 'https://github.com/')
-            .replace(/^https:\/\/.*?@github\.com\//, 'https://github.com/');
-        
-        return `${baseUrl}/tree/${branch}`;
-    }
-    
-    // 這裡可以添加對其他 Git 服務例如 GitLab、Bitbucket 的支持
-    
-    return null;
+// Build branch web URL
+function buildBranchWebUrl(repoInfo: {remoteUrl: string, branch: string}, customBranch?: string) {
+    const { remoteUrl } = repoInfo;
+    const branch = customBranch || repoInfo.branch;
+
+    return generateUrl({
+        remoteUrl,
+        branch,
+        filePath: '',
+    });
 }
 
 export function deactivate() {}

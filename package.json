@@ -2,7 +2,7 @@
   "name": "git-webpage-helper",
   "displayName": "Git Webpage Helper",
   "description": "Enhanced Git integration for VS Code",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "ReeceToolkit",
   "repository": {
     "type": "git",
@@ -21,7 +21,7 @@
     "bitbucket"
   ],
   "engines": {
-    "vscode": "^1.60.0"
+    "vscode": "^1.75.0"
   },
   "categories": [
     "Other"
@@ -37,11 +37,19 @@
     "commands": [
       {
         "command": "git-helper.openFileOnWeb",
-        "title": "Git Helper: Open on Web"
+        "title": "Open File on Web"
       },
       {
         "command": "git-helper.openBranchOnWeb",
-        "title": "Git Helper: Open Branch on Web"
+        "title": "Open Branch on Web"
+      },
+      {
+        "command": "git-helper.copyFileUrlToClipboard",
+        "title": "Copy File URL to Clipboard"
+      },
+      {
+        "command": "git-helper.copyBranchUrlToClipboard",
+        "title": "Copy Branch URL to Clipboard"
       }
     ],
     "menus": {
@@ -59,11 +67,7 @@
       ],
       "editor/lineNumber/context": [
         {
-          "command": "git-helper.openFileOnWeb",
-          "group": "navigation"
-        },
-        {
-          "command": "git-helper.openBranchOnWeb",
+          "submenu": "git-helper.submenu",
           "group": "navigation"
         }
       ],
@@ -75,6 +79,14 @@
         {
           "command": "git-helper.openBranchOnWeb",
           "group": "1_open"
+        },
+        {
+          "command": "git-helper.copyFileUrlToClipboard",
+          "group": "2_copy"
+        },
+        {
+          "command": "git-helper.copyBranchUrlToClipboard",
+          "group": "2_copy"
         }
       ]
     },
