@@ -4,18 +4,39 @@ interface UrlGeneratorOptions {
     filePath: string;
     lineStart?: number;
     lineEnd?: number;
+    includeFilePath?: boolean; // Option to include file path in branch URLs
 }
 
 /**
  * Generate a web URL for a file in a Git repository
  */
 export function generateUrl(options: UrlGeneratorOptions): string {
-    const { remoteUrl, branch, filePath, lineStart, lineEnd } = options;
+    const { remoteUrl, branch, filePath, lineStart, lineEnd, includeFilePath = true } = options;
     
     // Parse the remote URL to extract host, owner, and repo
     const { host, owner, repo } = parseRemoteUrl(remoteUrl);
     
-    // Generate the appropriate URL based on the hosting service
+    // If includeFilePath is false or filePath is empty, generate a branch-only URL
+    if (!includeFilePath || !filePath) {
+        if (host.includes('github')) {
+            return `https://${host}/${owner}/${repo}/tree/${branch}`;
+        } else if (host.includes('gitlab')) {
+            return `https://${host}/${owner}/${repo}/-/tree/${branch}`;
+        } else if (host.includes('bitbucket')) {
+            return `https://${host}/${owner}/${repo}/src/${branch}`;
+        } else if (host.includes('dev.azure.com') || host.includes('visualstudio.com')) {
+            if (host.includes('dev.azure.com')) {
+                const [org, project] = owner.split('/');
+                return `https://${host}/${org}/${project}/_git/${repo}?version=GB${branch}`;
+            } else {
+                return `https://${host}/${owner}/_git/${repo}?version=GB${branch}`;
+            }
+        } else {
+            return `https://${host}/${owner}/${repo}/tree/${branch}`;
+        }
+    }
+    
+    // Generate the appropriate URL based on the hosting service with file path and line numbers
     if (host.includes('github')) {
         return generateGitHubUrl(host, owner, repo, branch, filePath, lineStart, lineEnd);
     } else if (host.includes('gitlab')) {
@@ -26,7 +47,15 @@ export function generateUrl(options: UrlGeneratorOptions): string {
         return generateAzureDevOpsUrl(host, owner, repo, branch, filePath, lineStart, lineEnd);
     } else {
         // Generic Git web URL (might not work for all hosts)
-        return `https://${host}/${owner}/${repo}/blob/${branch}/${filePath}`;
+        let url = `https://${host}/${owner}/${repo}/blob/${branch}/${filePath}`;
+        // Add line numbers for generic URL if available
+        if (lineStart) {
+            url += `#L${lineStart}`;
+            if (lineEnd && lineEnd !== lineStart) {
+                url += `-L${lineEnd}`;
+            }
+        }
+        return url;
     }
 }
 

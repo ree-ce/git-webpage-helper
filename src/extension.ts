@@ -228,6 +228,11 @@ function buildWebUrl(repoInfo: {remoteUrl: string, branch: string, relativePath:
     const { remoteUrl, branch, relativePath } = repoInfo;
     
     let lineStart, lineEnd;
+    
+    // Always include the current line number, even when there's no selection
+    lineStart = selection.active.line + 1;
+    
+    // If there is a selection, include both start and end lines
     if (!selection.isEmpty) {
         lineStart = selection.start.line + 1;
         lineEnd = selection.end.line + 1;
@@ -246,14 +251,43 @@ function buildWebUrl(repoInfo: {remoteUrl: string, branch: string, relativePath:
 }
 
 // Build branch web URL
-function buildBranchWebUrl(repoInfo: {remoteUrl: string, branch: string}, customBranch?: string) {
-    const { remoteUrl } = repoInfo;
+function buildBranchWebUrl(repoInfo: {remoteUrl: string, branch: string, relativePath: string}, customBranch?: string) {
+    const { remoteUrl, relativePath } = repoInfo;
     const branch = customBranch || repoInfo.branch;
+    
+    // Get the active editor to check if we have a file open
+    const editor = vscode.window.activeTextEditor;
+    let filePath = '';
+    let lineStart: number | undefined;
+    let lineEnd: number | undefined;
+    
+    if (editor) {
+        // If we're viewing a file, include its path in the branch URL
+        filePath = relativePath;
+        
+        // Always include the current line number
+        lineStart = editor.selection.active.line + 1;
+        
+        // If there is a selection, include both start and end lines
+        if (!editor.selection.isEmpty) {
+            lineStart = editor.selection.start.line + 1;
+            lineEnd = editor.selection.end.line + 1;
+            if (lineStart === lineEnd) {
+                lineEnd = undefined;
+            }
+        }
+    }
 
+    // Check if this is a branch-only operation (no file path)
+    const includeFilePath = filePath.length > 0;
+    
     return generateUrl({
         remoteUrl,
         branch,
-        filePath: '',
+        filePath,
+        lineStart,
+        lineEnd,
+        includeFilePath
     });
 }
 
