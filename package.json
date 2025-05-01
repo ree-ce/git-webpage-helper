@@ -2,7 +2,7 @@
   "name": "git-webpage-helper",
   "displayName": "Git Webpage Helper",
   "description": "Enhanced Git integration for VS Code",
-  "version": "0.2.0",
+  "version": "0.2.3",
   "publisher": "ReeceToolkit",
   "repository": {
     "type": "git",
@@ -40,11 +40,19 @@
         "title": "Open File on Web"
       },
       {
+        "command": "git-helper.openFileFromExplorer",
+        "title": "Open File on Web"
+      },
+      {
         "command": "git-helper.openBranchOnWeb",
         "title": "Open Branch on Web"
       },
       {
         "command": "git-helper.copyFileUrlToClipboard",
+        "title": "Copy File URL to Clipboard"
+      },
+      {
+        "command": "git-helper.copyFileFromExplorer",
         "title": "Copy File URL to Clipboard"
       },
       {
@@ -55,23 +63,47 @@
     "menus": {
       "explorer/context": [
         {
-          "submenu": "git-helper.submenu",
+          "submenu": "git-helper.explorer-submenu",
           "group": "navigation"
         }
       ],
       "editor/context": [
         {
-          "submenu": "git-helper.submenu",
+          "submenu": "git-helper.editor-submenu",
           "group": "navigation"
         }
       ],
       "editor/lineNumber/context": [
         {
-          "submenu": "git-helper.submenu",
-          "group": "navigation"
+          "command": "git-helper.openFileOnWeb",
+          "group": "navigation@1"
+        },
+        {
+          "command": "git-helper.copyFileUrlToClipboard",
+          "group": "navigation@2"
         }
       ],
-      "git-helper.submenu": [
+      "git-helper.explorer-submenu": [
+        {
+          "command": "git-helper.openFileFromExplorer",
+          "group": "1_open",
+          "title": "Open File on Web"
+        },
+        {
+          "command": "git-helper.openBranchOnWeb",
+          "group": "1_open"
+        },
+        {
+          "command": "git-helper.copyFileFromExplorer",
+          "group": "2_copy",
+          "title": "Copy File URL to Clipboard"
+        },
+        {
+          "command": "git-helper.copyBranchUrlToClipboard",
+          "group": "2_copy"
+        }
+      ],
+      "git-helper.editor-submenu": [
         {
           "command": "git-helper.openFileOnWeb",
           "group": "1_open"
@@ -92,7 +124,11 @@
     },
     "submenus": [
       {
-        "id": "git-helper.submenu",
+        "id": "git-helper.explorer-submenu",
+        "label": "Git Helper"
+      },
+      {
+        "id": "git-helper.editor-submenu",
         "label": "Git Helper"
       }
     ]
