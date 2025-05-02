@@ -9,24 +9,12 @@ export function activate(context: vscode.ExtensionContext) {
         try {
             console.log('openFileOnWeb called with lineNumber:', lineNumber);
             
-            const editor = vscode.window.activeTextEditor;
-            if (!editor) {
-                vscode.window.showErrorMessage('No active editor found');
+            const filePath = await getFilePathFromContext();
+            if (!filePath) {
                 return;
             }
             
-            const filePath = editor.document.uri.fsPath;
-            let selection: vscode.Selection;
-            
-            if (typeof lineNumber === 'number') {
-                // 從行號右鍵選單呼叫，創建僅包含該行的選擇範圍
-                selection = new vscode.Selection(lineNumber - 1, 0, lineNumber - 1, 0);
-                console.log('Using line number selection:', lineNumber);
-            } else {
-                // 從編輯器內容呼叫，使用當前選擇範圍
-                selection = editor.selection;
-                console.log('Using editor selection:', selection.start.line + 1, selection.end.line + 1);
-            }
+            const selection = getSelectionFromContext(lineNumber);
             
             // Get Git repository information
             const repoInfo = await getGitRepoInfo(filePath);
@@ -35,17 +23,8 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             
-            // Build web URL
-            const webUrl = buildWebUrl(repoInfo, filePath, selection);
-            console.log('Generated URL:', webUrl);
-            
-            if (!webUrl) {
-                vscode.window.showErrorMessage('Could not determine web URL for this repository');
-                return;
-            }
-            
             // Open browser
-            vscode.env.openExternal(vscode.Uri.parse(webUrl));
+            await openInBrowser(repoInfo, filePath, selection);
         } catch (error) {
             vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -56,12 +35,10 @@ export function activate(context: vscode.ExtensionContext) {
         try {
             console.log('openFileFromExplorer called with URI:', uri ? uri.fsPath : 'undefined');
             
-            if (!uri) {
-                vscode.window.showErrorMessage('No file selected');
+            const filePath = await getFilePathFromContext(uri);
+            if (!filePath) {
                 return;
             }
-            
-            const filePath = uri.fsPath;
             
             // Get Git repository information
             const repoInfo = await getGitRepoInfo(filePath);
@@ -70,17 +47,8 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             
-            // Build web URL (no selection/line numbers for Explorer)
-            const webUrl = buildWebUrl(repoInfo, filePath);
-            console.log('Generated URL:', webUrl);
-            
-            if (!webUrl) {
-                vscode.window.showErrorMessage('Could not determine web URL for this repository');
-                return;
-            }
-            
             // Open browser
-            vscode.env.openExternal(vscode.Uri.parse(webUrl));
+            await openInBrowser(repoInfo, filePath);
         } catch (error) {
             vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -91,24 +59,12 @@ export function activate(context: vscode.ExtensionContext) {
         try {
             console.log('copyFileUrlToClipboard called with lineNumber:', lineNumber);
             
-            const editor = vscode.window.activeTextEditor;
-            if (!editor) {
-                vscode.window.showErrorMessage('No active editor found');
+            const filePath = await getFilePathFromContext();
+            if (!filePath) {
                 return;
             }
             
-            const filePath = editor.document.uri.fsPath;
-            let selection: vscode.Selection;
-            
-            if (typeof lineNumber === 'number') {
-                // 從行號右鍵選單呼叫，創建僅包含該行的選擇範圍
-                selection = new vscode.Selection(lineNumber - 1, 0, lineNumber - 1, 0);
-                console.log('Using line number selection:', lineNumber);
-            } else {
-                // 從編輯器內容呼叫，使用當前選擇範圍
-                selection = editor.selection;
-                console.log('Using editor selection:', selection.start.line + 1, selection.end.line + 1);
-            }
+            const selection = getSelectionFromContext(lineNumber);
             
             // Get Git repository information
             const repoInfo = await getGitRepoInfo(filePath);
@@ -117,18 +73,8 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             
-            // Build web URL
-            const webUrl = buildWebUrl(repoInfo, filePath, selection);
-            console.log('Generated URL:', webUrl);
-            
-            if (!webUrl) {
-                vscode.window.showErrorMessage('Could not determine web URL for this repository');
-                return;
-            }
-            
             // Copy to clipboard
-            await vscode.env.clipboard.writeText(webUrl);
-            vscode.window.showInformationMessage('URL copied to clipboard!');
+            await copyToClipboard(repoInfo, filePath, selection);
         } catch (error) {
             vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -139,12 +85,10 @@ export function activate(context: vscode.ExtensionContext) {
         try {
             console.log('copyFileFromExplorer called with URI:', uri ? uri.fsPath : 'undefined');
             
-            if (!uri) {
-                vscode.window.showErrorMessage('No file selected');
+            const filePath = await getFilePathFromContext(uri);
+            if (!filePath) {
                 return;
             }
-            
-            const filePath = uri.fsPath;
             
             // Get Git repository information
             const repoInfo = await getGitRepoInfo(filePath);
@@ -153,18 +97,8 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
             
-            // Build web URL (no selection/line numbers for Explorer)
-            const webUrl = buildWebUrl(repoInfo, filePath);
-            console.log('Generated URL:', webUrl);
-            
-            if (!webUrl) {
-                vscode.window.showErrorMessage('Could not determine web URL for this repository');
-                return;
-            }
-            
             // Copy to clipboard
-            await vscode.env.clipboard.writeText(webUrl);
-            vscode.window.showInformationMessage('URL copied to clipboard!');
+            await copyToClipboard(repoInfo, filePath);
         } catch (error) {
             vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -173,19 +107,9 @@ export function activate(context: vscode.ExtensionContext) {
     // Register command: Open branch on web
     const openBranchOnWeb = vscode.commands.registerCommand('git-helper.openBranchOnWeb', async (uri?: vscode.Uri) => {
         try {
-            let filePath: string;
-            
-            if (uri) {
-                // 從 Explorer 面板呼叫，使用所提供的檔案路徑
-                filePath = uri.fsPath;
-            } else {
-                // 從編輯器或命令列呼叫，使用當前編輯器
-                const editor = vscode.window.activeTextEditor;
-                if (!editor) {
-                    vscode.window.showErrorMessage('No active editor found');
-                    return;
-                }
-                filePath = editor.document.uri.fsPath;
+            const filePath = await getFilePathFromContext(uri);
+            if (!filePath) {
+                return;
             }
 
             const dirPath = path.dirname(filePath);
@@ -203,15 +127,8 @@ export function activate(context: vscode.ExtensionContext) {
                 return; // User cancelled the selection
             }
             
-            // Build branch web URL
-            const webUrl = buildBranchWebUrl(repoInfo, selectedBranch);
-            if (!webUrl) {
-                vscode.window.showErrorMessage('Could not determine web URL for this repository');
-                return;
-            }
-            
-            // Open browser
-            vscode.env.openExternal(vscode.Uri.parse(webUrl));
+            // Build branch web URL and open in browser
+            await openBranchInBrowser(repoInfo, selectedBranch);
         } catch (error) {
             vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -220,19 +137,9 @@ export function activate(context: vscode.ExtensionContext) {
     // Register command: Copy branch URL to clipboard
     const copyBranchUrlToClipboard = vscode.commands.registerCommand('git-helper.copyBranchUrlToClipboard', async (uri?: vscode.Uri) => {
         try {
-            let filePath: string;
-            
-            if (uri) {
-                // 從 Explorer 面板呼叫，使用所提供的檔案路徑
-                filePath = uri.fsPath;
-            } else {
-                // 從編輯器或命令列呼叫，使用當前編輯器
-                const editor = vscode.window.activeTextEditor;
-                if (!editor) {
-                    vscode.window.showErrorMessage('No active editor found');
-                    return;
-                }
-                filePath = editor.document.uri.fsPath;
+            const filePath = await getFilePathFromContext(uri);
+            if (!filePath) {
+                return;
             }
 
             const dirPath = path.dirname(filePath);
@@ -250,16 +157,8 @@ export function activate(context: vscode.ExtensionContext) {
                 return; // User cancelled the selection
             }
             
-            // Build branch web URL
-            const webUrl = buildBranchWebUrl(repoInfo, selectedBranch);
-            if (!webUrl) {
-                vscode.window.showErrorMessage('Could not determine web URL for this repository');
-                return;
-            }
-            
-            // Copy to clipboard
-            await vscode.env.clipboard.writeText(webUrl);
-            vscode.window.showInformationMessage('Branch URL copied to clipboard!');
+            // Build branch web URL and copy to clipboard
+            await copyBranchToClipboard(repoInfo, selectedBranch);
         } catch (error) {
             vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -340,14 +239,11 @@ async function getBranchSelection(dirPath: string): Promise<string | undefined> 
     });
 }
 
-// Build web URL
-function buildWebUrl(repoInfo: {remoteUrl: string, branch: string, relativePath: string}, filePath: string, selection?: vscode.Selection) {
-    const { remoteUrl, branch, relativePath } = repoInfo;
-    
+// 提取共用的處理選擇範圍和行號的函數
+function processSelection(selection?: vscode.Selection): { lineStart?: number, lineEnd?: number } {
     let lineStart: number | undefined;
     let lineEnd: number | undefined;
     
-    // 只有在有 selection 時才包含行號
     if (selection) {
         // Always include the current line number, even when there's no selection
         lineStart = selection.active.line + 1;
@@ -361,6 +257,14 @@ function buildWebUrl(repoInfo: {remoteUrl: string, branch: string, relativePath:
             }
         }
     }
+    
+    return { lineStart, lineEnd };
+}
+
+// Build web URL
+function buildWebUrl(repoInfo: {remoteUrl: string, branch: string, relativePath: string}, filePath: string, selection?: vscode.Selection) {
+    const { remoteUrl, branch, relativePath } = repoInfo;
+    const { lineStart, lineEnd } = processSelection(selection);
     
     return generateUrl({
         remoteUrl,
@@ -386,17 +290,9 @@ function buildBranchWebUrl(repoInfo: {remoteUrl: string, branch: string, relativ
         // If we're viewing a file, include its path in the branch URL
         filePath = relativePath;
         
-        // Always include the current line number
-        lineStart = editor.selection.active.line + 1;
-        
-        // If there is a selection, include both start and end lines
-        if (!editor.selection.isEmpty) {
-            lineStart = editor.selection.start.line + 1;
-            lineEnd = editor.selection.end.line + 1;
-            if (lineStart === lineEnd) {
-                lineEnd = undefined;
-            }
-        }
+        const selectionInfo = processSelection(editor.selection);
+        lineStart = selectionInfo.lineStart;
+        lineEnd = selectionInfo.lineEnd;
     }
 
     // Check if this is a branch-only operation (no file path)
@@ -410,6 +306,108 @@ function buildBranchWebUrl(repoInfo: {remoteUrl: string, branch: string, relativ
         lineEnd,
         includeFilePath
     });
+}
+
+// 通用處理函數：從編輯器或工作區獲取檔案路徑
+async function getFilePathFromContext(uri?: vscode.Uri): Promise<string | null> {
+    if (uri) {
+        // 從 Explorer 面板呼叫，使用所提供的檔案路徑
+        return uri.fsPath;
+    } else {
+        // 從編輯器或命令列呼叫，使用當前編輯器
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showErrorMessage('No active editor found');
+            return null;
+        }
+        return editor.document.uri.fsPath;
+    }
+}
+
+// 通用處理函數：處理選擇範圍（包括從行號參數創建選擇範圍）
+function getSelectionFromContext(lineNumber?: number): vscode.Selection | undefined {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        return undefined;
+    }
+    
+    if (typeof lineNumber === 'number') {
+        // 從行號右鍵選單呼叫，創建僅包含該行的選擇範圍
+        return new vscode.Selection(lineNumber - 1, 0, lineNumber - 1, 0);
+    } else {
+        // 從編輯器內容呼叫，使用當前選擇範圍
+        return editor.selection;
+    }
+}
+
+// 通用處理函數：生成 Web URL 並開啟瀏覽器
+async function openInBrowser(repoInfo: any, filePath: string, selection?: vscode.Selection): Promise<boolean> {
+    try {
+        const webUrl = buildWebUrl(repoInfo, filePath, selection);
+        if (!webUrl) {
+            vscode.window.showErrorMessage('Could not determine web URL for this repository');
+            return false;
+        }
+        
+        await vscode.env.openExternal(vscode.Uri.parse(webUrl));
+        return true;
+    } catch (error) {
+        vscode.window.showErrorMessage(`Error opening browser: ${error instanceof Error ? error.message : String(error)}`);
+        return false;
+    }
+}
+
+// 通用處理函數：生成 Web URL 並複製到剪貼簿
+async function copyToClipboard(repoInfo: any, filePath: string, selection?: vscode.Selection): Promise<boolean> {
+    try {
+        const webUrl = buildWebUrl(repoInfo, filePath, selection);
+        if (!webUrl) {
+            vscode.window.showErrorMessage('Could not determine web URL for this repository');
+            return false;
+        }
+        
+        await vscode.env.clipboard.writeText(webUrl);
+        vscode.window.showInformationMessage('URL copied to clipboard!');
+        return true;
+    } catch (error) {
+        vscode.window.showErrorMessage(`Error copying to clipboard: ${error instanceof Error ? error.message : String(error)}`);
+        return false;
+    }
+}
+
+// 通用處理函數：生成 Branch Web URL 並開啟瀏覽器
+async function openBranchInBrowser(repoInfo: any, customBranch?: string): Promise<boolean> {
+    try {
+        const webUrl = buildBranchWebUrl(repoInfo, customBranch);
+        if (!webUrl) {
+            vscode.window.showErrorMessage('Could not determine web URL for this repository');
+            return false;
+        }
+        
+        await vscode.env.openExternal(vscode.Uri.parse(webUrl));
+        return true;
+    } catch (error) {
+        vscode.window.showErrorMessage(`Error opening browser: ${error instanceof Error ? error.message : String(error)}`);
+        return false;
+    }
+}
+
+// 通用處理函數：生成 Branch Web URL 並複製到剪貼簿
+async function copyBranchToClipboard(repoInfo: any, customBranch?: string): Promise<boolean> {
+    try {
+        const webUrl = buildBranchWebUrl(repoInfo, customBranch);
+        if (!webUrl) {
+            vscode.window.showErrorMessage('Could not determine web URL for this repository');
+            return false;
+        }
+        
+        await vscode.env.clipboard.writeText(webUrl);
+        vscode.window.showInformationMessage('Branch URL copied to clipboard!');
+        return true;
+    } catch (error) {
+        vscode.window.showErrorMessage(`Error copying to clipboard: ${error instanceof Error ? error.message : String(error)}`);
+        return false;
+    }
 }
 
 export function deactivate() {}
