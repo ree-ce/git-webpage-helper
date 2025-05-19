@@ -6,162 +6,74 @@ import { generateUrl } from './url-generator';
 export function activate(context: vscode.ExtensionContext) {
     // Register command: Open file on web (from Editor)
     const openFileOnWebFromEditor = vscode.commands.registerCommand('git-helper.openFileOnWeb', async (lineNumber?: number) => {
-        try {
-            console.log('openFileOnWeb called with lineNumber:', lineNumber);
-            
-            const filePath = await getFilePathFromContext();
-            if (!filePath) {
-                return;
-            }
-            
-            const selection = getSelectionFromContext(lineNumber);
-            
-            // Get Git repository information
-            const repoInfo = await getGitRepoInfo(filePath);
-            if (!repoInfo) {
-                vscode.window.showErrorMessage('Failed to get repository information');
-                return;
-            }
-            
-            // Open browser
-            await openInBrowser(repoInfo, filePath, selection);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
-        }
+        await handleGitAction({
+            actionType: 'open',
+            targetType: 'file',
+            lineNumber
+        });
     });
     
     // Register command: Open file on web (from Explorer)
     const openFileOnWebFromExplorer = vscode.commands.registerCommand('git-helper.openFileFromExplorer', async (uri: vscode.Uri) => {
-        try {
-            console.log('openFileFromExplorer called with URI:', uri ? uri.fsPath : 'undefined');
-            
-            const filePath = await getFilePathFromContext(uri);
-            if (!filePath) {
-                return;
-            }
-            
-            // Get Git repository information
-            const repoInfo = await getGitRepoInfo(filePath);
-            if (!repoInfo) {
-                vscode.window.showErrorMessage('Failed to get repository information');
-                return;
-            }
-            
-            // Open browser
-            await openInBrowser(repoInfo, filePath);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
-        }
+        await handleGitAction({
+            actionType: 'open',
+            targetType: 'file',
+            uri
+        });
     });
     
     // Register command: Copy file URL to clipboard (from Editor)
     const copyFileUrlToClipboardFromEditor = vscode.commands.registerCommand('git-helper.copyFileUrlToClipboard', async (lineNumber?: number) => {
-        try {
-            console.log('copyFileUrlToClipboard called with lineNumber:', lineNumber);
-            
-            const filePath = await getFilePathFromContext();
-            if (!filePath) {
-                return;
-            }
-            
-            const selection = getSelectionFromContext(lineNumber);
-            
-            // Get Git repository information
-            const repoInfo = await getGitRepoInfo(filePath);
-            if (!repoInfo) {
-                vscode.window.showErrorMessage('Failed to get repository information');
-                return;
-            }
-            
-            // Copy to clipboard
-            await copyToClipboard(repoInfo, filePath, selection);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
-        }
+        await handleGitAction({
+            actionType: 'copy',
+            targetType: 'file',
+            lineNumber
+        });
     });
     
     // Register command: Copy file URL to clipboard (from Explorer)
     const copyFileUrlToClipboardFromExplorer = vscode.commands.registerCommand('git-helper.copyFileFromExplorer', async (uri: vscode.Uri) => {
-        try {
-            console.log('copyFileFromExplorer called with URI:', uri ? uri.fsPath : 'undefined');
-            
-            const filePath = await getFilePathFromContext(uri);
-            if (!filePath) {
-                return;
-            }
-            
-            // Get Git repository information
-            const repoInfo = await getGitRepoInfo(filePath);
-            if (!repoInfo) {
-                vscode.window.showErrorMessage('Failed to get repository information');
-                return;
-            }
-            
-            // Copy to clipboard
-            await copyToClipboard(repoInfo, filePath);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
-        }
+        await handleGitAction({
+            actionType: 'copy',
+            targetType: 'file',
+            uri
+        });
     });
 
-    // Register command: Open branch on web
-    const openBranchOnWeb = vscode.commands.registerCommand('git-helper.openBranchOnWeb', async (uri?: vscode.Uri) => {
-        try {
-            const filePath = await getFilePathFromContext(uri);
-            if (!filePath) {
-                return;
-            }
-
-            const dirPath = path.dirname(filePath);
-            
-            // Get Git repository information
-            const repoInfo = await getGitRepoInfo(filePath);
-            if (!repoInfo) {
-                vscode.window.showErrorMessage('Failed to get repository information');
-                return;
-            }
-
-            // Get branch selection
-            const selectedBranch = await getBranchSelection(dirPath);
-            if (!selectedBranch) {
-                return; // User cancelled the selection
-            }
-            
-            // Build branch web URL and open in browser
-            await openBranchInBrowser(repoInfo, selectedBranch);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
-        }
+    // Register command: Open branch on web from Editor
+    const openBranchOnWeb = vscode.commands.registerCommand('git-helper.openBranchOnWeb', async (lineNumber?: number) => {
+        await handleGitAction({
+            actionType: 'open',
+            targetType: 'branch',
+            lineNumber
+        });
     });
     
-    // Register command: Copy branch URL to clipboard
-    const copyBranchUrlToClipboard = vscode.commands.registerCommand('git-helper.copyBranchUrlToClipboard', async (uri?: vscode.Uri) => {
-        try {
-            const filePath = await getFilePathFromContext(uri);
-            if (!filePath) {
-                return;
-            }
-
-            const dirPath = path.dirname(filePath);
-            
-            // Get Git repository information
-            const repoInfo = await getGitRepoInfo(filePath);
-            if (!repoInfo) {
-                vscode.window.showErrorMessage('Failed to get repository information');
-                return;
-            }
-
-            // Get branch selection
-            const selectedBranch = await getBranchSelection(dirPath);
-            if (!selectedBranch) {
-                return; // User cancelled the selection
-            }
-            
-            // Build branch web URL and copy to clipboard
-            await copyBranchToClipboard(repoInfo, selectedBranch);
-        } catch (error) {
-            vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
-        }
+    // Register command: Open branch on web from Explorer
+    const openBranchFromExplorer = vscode.commands.registerCommand('git-helper.openBranchFromExplorer', async (uri: vscode.Uri) => {
+        await handleGitAction({
+            actionType: 'open',
+            targetType: 'branch',
+            uri
+        });
+    });
+    
+    // Register command: Copy branch URL to clipboard from Editor
+    const copyBranchUrlToClipboard = vscode.commands.registerCommand('git-helper.copyBranchUrlToClipboard', async (lineNumber?: number) => {
+        await handleGitAction({
+            actionType: 'copy',
+            targetType: 'branch',
+            lineNumber
+        });
+    });
+    
+    // Register command: Copy branch URL to clipboard from Explorer
+    const copyBranchFromExplorer = vscode.commands.registerCommand('git-helper.copyBranchFromExplorer', async (uri: vscode.Uri) => {
+        await handleGitAction({
+            actionType: 'copy',
+            targetType: 'branch',
+            uri
+        });
     });
 
     context.subscriptions.push(
@@ -169,8 +81,10 @@ export function activate(context: vscode.ExtensionContext) {
         openFileOnWebFromExplorer,
         copyFileUrlToClipboardFromEditor,
         copyFileUrlToClipboardFromExplorer,
-        openBranchOnWeb, 
-        copyBranchUrlToClipboard
+        openBranchOnWeb,
+        openBranchFromExplorer,
+        copyBranchUrlToClipboard,
+        copyBranchFromExplorer
     );
 }
 
@@ -261,8 +175,8 @@ function processSelection(selection?: vscode.Selection): { lineStart?: number, l
     return { lineStart, lineEnd };
 }
 
-// Build web URL
-function buildWebUrl(repoInfo: {remoteUrl: string, branch: string, relativePath: string}, filePath: string, selection?: vscode.Selection) {
+// Build file URL
+function generateFileUrl(repoInfo: {remoteUrl: string, branch: string, relativePath: string}, selection?: vscode.Selection) {
     const { remoteUrl, branch, relativePath } = repoInfo;
     const { lineStart, lineEnd } = processSelection(selection);
     
@@ -275,24 +189,41 @@ function buildWebUrl(repoInfo: {remoteUrl: string, branch: string, relativePath:
     });
 }
 
-// Build branch web URL
-function buildBranchWebUrl(repoInfo: {remoteUrl: string, branch: string, relativePath: string}, customBranch?: string) {
+// Build branch URL
+function generateBranchUrl(
+    repoInfo: {remoteUrl: string, branch: string, relativePath: string}, 
+    customBranch?: string, 
+    fromExplorer: boolean = false,
+    selection?: vscode.Selection // Add selection parameter
+) {
     const { remoteUrl, relativePath } = repoInfo;
     const branch = customBranch || repoInfo.branch;
     
-    // Get the active editor to check if we have a file open
-    const editor = vscode.window.activeTextEditor;
-    let filePath = '';
+    let filePath = relativePath; // Default to include the file path
     let lineStart: number | undefined;
     let lineEnd: number | undefined;
     
-    if (editor) {
-        // If we're viewing a file, include its path in the branch URL
-        filePath = relativePath;
-        
+    // Get the active editor to check if we have a file open
+    const editor = vscode.window.activeTextEditor;
+    
+    console.log(`generateBranchUrl called: fromExplorer=${fromExplorer}, editor=${!!editor}, customBranch=${customBranch}, selection=${!!selection}`);
+    
+    // If a specific selection is provided, use it first (from line number menu)
+    if (selection) {
+        const selectionInfo = processSelection(selection);
+        lineStart = selectionInfo.lineStart;
+        lineEnd = selectionInfo.lineEnd;
+        console.log(`Selection from parameter: lineStart=${lineStart}, lineEnd=${lineEnd}`);
+    }
+    // Otherwise, use the active editor's selection when called from editor (not explorer)
+    else if (editor && !fromExplorer) {
+        // If we're viewing a file in editor (not from explorer), include its path and selection in the branch URL
         const selectionInfo = processSelection(editor.selection);
         lineStart = selectionInfo.lineStart;
         lineEnd = selectionInfo.lineEnd;
+        console.log(`Selection from editor: lineStart=${lineStart}, lineEnd=${lineEnd}`);
+    } else {
+        console.log(`No line numbers included: fromExplorer=${fromExplorer}, editor=${!!editor}`);
     }
 
     // Check if this is a branch-only operation (no file path)
@@ -340,72 +271,113 @@ function getSelectionFromContext(lineNumber?: number): vscode.Selection | undefi
     }
 }
 
-// 通用處理函數：生成 Web URL 並開啟瀏覽器
-async function openInBrowser(repoInfo: any, filePath: string, selection?: vscode.Selection): Promise<boolean> {
+/**
+ * 處理URL操作的核心函數
+ * 根據操作類型和URL類型執行不同的操作
+ */
+async function performUrlAction(
+    options: {
+        actionType: 'open' | 'copy',
+        url: string,
+        targetType: 'file' | 'branch'
+    }
+): Promise<boolean> {
     try {
-        const webUrl = buildWebUrl(repoInfo, filePath, selection);
-        if (!webUrl) {
+        const { actionType, url, targetType } = options;
+        
+        if (!url) {
             vscode.window.showErrorMessage('Could not determine web URL for this repository');
             return false;
         }
         
-        await vscode.env.openExternal(vscode.Uri.parse(webUrl));
-        return true;
+        if (actionType === 'open') {
+            // 打開瀏覽器
+            await vscode.env.openExternal(vscode.Uri.parse(url));
+            return true;
+        } else { // copy
+            // 複製到剪貼簿
+            await vscode.env.clipboard.writeText(url);
+            vscode.window.showInformationMessage(`${targetType === 'file' ? 'URL' : 'Branch URL'} copied to clipboard!`);
+            return true;
+        }
     } catch (error) {
-        vscode.window.showErrorMessage(`Error opening browser: ${error instanceof Error ? error.message : String(error)}`);
+        const action = options.actionType === 'open' ? 'opening browser' : 'copying to clipboard';
+        vscode.window.showErrorMessage(`Error ${action}: ${error instanceof Error ? error.message : String(error)}`);
         return false;
     }
 }
 
-// 通用處理函數：生成 Web URL 並複製到剪貼簿
-async function copyToClipboard(repoInfo: any, filePath: string, selection?: vscode.Selection): Promise<boolean> {
-    try {
-        const webUrl = buildWebUrl(repoInfo, filePath, selection);
-        if (!webUrl) {
-            vscode.window.showErrorMessage('Could not determine web URL for this repository');
-            return false;
-        }
-        
-        await vscode.env.clipboard.writeText(webUrl);
-        vscode.window.showInformationMessage('URL copied to clipboard!');
-        return true;
-    } catch (error) {
-        vscode.window.showErrorMessage(`Error copying to clipboard: ${error instanceof Error ? error.message : String(error)}`);
-        return false;
+/**
+ * 統一處理不同來源和操作的函數
+ * 
+ * @param options 操作選項
+ * @returns Promise<boolean> 操作是否成功
+ */
+async function handleGitAction(
+    options: {
+        // 操作類型：在瀏覽器中打開或複製到剪貼簿
+        actionType: 'open' | 'copy',
+        // 操作對象：文件或分支
+        targetType: 'file' | 'branch',
+        // 從編輯器或資源管理器觸發
+        uri?: vscode.Uri,
+        // 編輯器行號（從編輯器右鍵菜單觸發時可能提供）
+        lineNumber?: number,
+        // 自定義分支（用於分支操作時）
+        customBranch?: string
     }
-}
-
-// 通用處理函數：生成 Branch Web URL 並開啟瀏覽器
-async function openBranchInBrowser(repoInfo: any, customBranch?: string): Promise<boolean> {
+): Promise<boolean> {
     try {
-        const webUrl = buildBranchWebUrl(repoInfo, customBranch);
-        if (!webUrl) {
-            vscode.window.showErrorMessage('Could not determine web URL for this repository');
+        // 確定來源：Explorer 或 Editor
+        const source = options.uri ? 'explorer' : 'editor';
+        const fromExplorer = source === 'explorer';
+        
+        console.log(`handleGitAction: actionType=${options.actionType}, targetType=${options.targetType}, source=${source}, fromExplorer=${fromExplorer}, lineNumber=${options.lineNumber}, customBranch=${options.customBranch}`);
+        
+        // 獲取文件路徑
+        const filePath = await getFilePathFromContext(options.uri);
+        if (!filePath) {
             return false;
         }
         
-        await vscode.env.openExternal(vscode.Uri.parse(webUrl));
-        return true;
-    } catch (error) {
-        vscode.window.showErrorMessage(`Error opening browser: ${error instanceof Error ? error.message : String(error)}`);
-        return false;
-    }
-}
-
-// 通用處理函數：生成 Branch Web URL 並複製到剪貼簿
-async function copyBranchToClipboard(repoInfo: any, customBranch?: string): Promise<boolean> {
-    try {
-        const webUrl = buildBranchWebUrl(repoInfo, customBranch);
-        if (!webUrl) {
-            vscode.window.showErrorMessage('Could not determine web URL for this repository');
+        // 獲取 Git 倉庫信息
+        const repoInfo = await getGitRepoInfo(filePath);
+        if (!repoInfo) {
+            vscode.window.showErrorMessage('Failed to get repository information');
             return false;
         }
         
-        await vscode.env.clipboard.writeText(webUrl);
-        vscode.window.showInformationMessage('Branch URL copied to clipboard!');
-        return true;
+        // 處理分支選擇（如果是分支操作且沒有提供自定義分支）
+        let selectedBranch = options.customBranch;
+        if (options.targetType === 'branch' && !selectedBranch) {
+            const dirPath = path.dirname(filePath);
+            selectedBranch = await getBranchSelection(dirPath);
+            if (!selectedBranch) {
+                return false; // 用戶取消了選擇
+            }
+        }
+        
+        // 獲取編輯器選擇範圍（如果是從編輯器觸發且提供了行號）
+        const selection = options.lineNumber ? 
+            getSelectionFromContext(options.lineNumber) : 
+            (source === 'editor' ? getSelectionFromContext() : undefined);
+        
+        // 根據操作對象生成適當的URL
+        let url: string;
+        if (options.targetType === 'file') {
+            url = generateFileUrl(repoInfo, selection);
+        } else { // branch
+            url = generateBranchUrl(repoInfo, selectedBranch, fromExplorer, selection);
+        }
+        
+        // 執行URL操作（開啟或複製）
+        return await performUrlAction({
+            actionType: options.actionType,
+            url,
+            targetType: options.targetType
+        });
     } catch (error) {
-        vscode.window.showErrorMessage(`Error copying to clipboard: ${error instanceof Error ? error.message : String(error)}`);
+        vscode.window.showErrorMessage(`Error: ${error instanceof Error ? error.message : String(error)}`);
         return false;
     }
 }

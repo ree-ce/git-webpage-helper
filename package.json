@@ -30,7 +30,13 @@
     "onStartupFinished",
     "workspaceContains:.git",
     "onCommand:git-helper.openFileOnWeb",
-    "onCommand:git-helper.openBranchOnWeb"
+    "onCommand:git-helper.openFileFromExplorer",
+    "onCommand:git-helper.openBranchOnWeb",
+    "onCommand:git-helper.openBranchFromExplorer",
+    "onCommand:git-helper.copyFileUrlToClipboard",
+    "onCommand:git-helper.copyFileFromExplorer",
+    "onCommand:git-helper.copyBranchUrlToClipboard",
+    "onCommand:git-helper.copyBranchFromExplorer"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -48,6 +54,10 @@
         "title": "Open Branch on Web"
       },
       {
+        "command": "git-helper.openBranchFromExplorer",
+        "title": "Open Branch on Web"
+      },
+      {
         "command": "git-helper.copyFileUrlToClipboard",
         "title": "Copy File URL to Clipboard"
       },
@@ -57,6 +67,10 @@
       },
       {
         "command": "git-helper.copyBranchUrlToClipboard",
+        "title": "Copy Branch URL to Clipboard"
+      },
+      {
+        "command": "git-helper.copyBranchFromExplorer",
         "title": "Copy Branch URL to Clipboard"
       }
     ],
@@ -81,6 +95,14 @@
         {
           "command": "git-helper.copyFileUrlToClipboard",
           "group": "navigation@2"
+        },
+        {
+          "command": "git-helper.openBranchOnWeb",
+          "group": "navigation@3"
+        },
+        {
+          "command": "git-helper.copyBranchUrlToClipboard",
+          "group": "navigation@4"
         }
       ],
       "git-helper.explorer-submenu": [
@@ -90,8 +112,9 @@
           "title": "Open File on Web"
         },
         {
-          "command": "git-helper.openBranchOnWeb",
-          "group": "1_open"
+          "command": "git-helper.openBranchFromExplorer",
+          "group": "1_open",
+          "title": "Open Branch on Web"
         },
         {
           "command": "git-helper.copyFileFromExplorer",
@@ -99,8 +122,9 @@
           "title": "Copy File URL to Clipboard"
         },
         {
-          "command": "git-helper.copyBranchUrlToClipboard",
-          "group": "2_copy"
+          "command": "git-helper.copyBranchFromExplorer",
+          "group": "2_copy",
+          "title": "Copy Branch URL to Clipboard"
         }
       ],
       "git-helper.editor-submenu": [
