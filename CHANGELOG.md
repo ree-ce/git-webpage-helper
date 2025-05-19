@@ -6,4 +6,9 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+### Added
+- Custom host mapping configuration to support multiple Git accounts with custom SSH host aliases
+- Better handling of SSH host aliases in URL generation
+
+## [0.2.3]
 - Initial release

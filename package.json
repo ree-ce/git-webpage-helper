@@ -40,6 +40,19 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "Git Webpage Helper",
+      "properties": {
+        "gitWebpageHelper.hostMapping": {
+          "type": "object",
+          "default": {},
+          "description": "Custom mapping from SSH host aliases to actual domain names (e.g., {\"github_account_a\": \"github.com\"})",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "commands": [
       {
         "command": "git-helper.openFileOnWeb",

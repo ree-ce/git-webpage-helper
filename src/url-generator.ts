@@ -1,3 +1,5 @@
+import * as vscode from 'vscode';
+
 interface UrlGeneratorOptions {
     remoteUrl: string;
     branch: string;
@@ -18,11 +20,11 @@ export function generateUrl(options: UrlGeneratorOptions): string {
     
     // If includeFilePath is false or filePath is empty, generate a branch-only URL
     if (!includeFilePath || !filePath) {
-        if (host.includes('github')) {
+        if (host === 'github.com') {
             return `https://${host}/${owner}/${repo}/tree/${branch}`;
-        } else if (host.includes('gitlab')) {
+        } else if (host === 'gitlab.com') {
             return `https://${host}/${owner}/${repo}/-/tree/${branch}`;
-        } else if (host.includes('bitbucket')) {
+        } else if (host === 'bitbucket.org') {
             return `https://${host}/${owner}/${repo}/src/${branch}`;
         } else if (host.includes('dev.azure.com') || host.includes('visualstudio.com')) {
             if (host.includes('dev.azure.com')) {
@@ -37,11 +39,11 @@ export function generateUrl(options: UrlGeneratorOptions): string {
     }
     
     // Generate the appropriate URL based on the hosting service with file path and line numbers
-    if (host.includes('github')) {
+    if (host === 'github.com') {
         return generateGitHubUrl(host, owner, repo, branch, filePath, lineStart, lineEnd);
-    } else if (host.includes('gitlab')) {
+    } else if (host === 'gitlab.com') {
         return generateGitLabUrl(host, owner, repo, branch, filePath, lineStart, lineEnd);
-    } else if (host.includes('bitbucket')) {
+    } else if (host === 'bitbucket.org') {
         return generateBitbucketUrl(host, owner, repo, branch, filePath, lineStart, lineEnd);
     } else if (host.includes('dev.azure.com') || host.includes('visualstudio.com')) {
         return generateAzureDevOpsUrl(host, owner, repo, branch, filePath, lineStart, lineEnd);
@@ -63,35 +65,98 @@ export function generateUrl(options: UrlGeneratorOptions): string {
  * Parse a Git remote URL into components
  */
 function parseRemoteUrl(url: string): { host: string; owner: string; repo: string } {
+    // Get host mappings from user settings
+    const config = vscode.workspace.getConfiguration('gitWebpageHelper');
+    const userHostMapping = config.get<Record<string, string>>('hostMapping') || {};
+    
+    // Combine default mappings with user mappings
+    const hostMap: Record<string, string> = {
+        'github.com': 'github.com',
+        'gitlab.com': 'gitlab.com',
+        'bitbucket.org': 'bitbucket.org',
+        ...userHostMapping
+    };
+
+    // Extract host, owner, and repo from the URL
+    let host: string;
+    let owner: string;
+    let repo: string;
+
     // Handle SSH URLs (git@github.com:owner/repo.git)
     if (url.startsWith('git@')) {
         const sshMatch = url.match(/git@([^:]+):([^\/]+)\/(.+)\.git/);
         if (sshMatch) {
-            return {
-                host: sshMatch[1],
-                owner: sshMatch[2],
-                repo: sshMatch[3]
-            };
+            host = sshMatch[1];
+            owner = sshMatch[2];
+            repo = sshMatch[3];
+        } else {
+            // If we can't parse it with the regex, fallback to manual parsing
+            const parts = url.replace(/\.git$/, '').split(/[\/:]/).filter(Boolean);
+            host = parts[0].replace(/^git@/, '');
+            owner = parts[parts.length - 2] || '';
+            repo = parts[parts.length - 1] || '';
         }
     }
-    
     // Handle HTTPS URLs (https://github.com/owner/repo.git)
-    const httpsMatch = url.match(/https?:\/\/([^\/]+)\/([^\/]+)\/(.+?)(\.git)?$/);
-    if (httpsMatch) {
-        return {
-            host: httpsMatch[1],
-            owner: httpsMatch[2],
-            repo: httpsMatch[3].replace('.git', '')
-        };
+    else if (url.startsWith('http')) {
+        const httpsMatch = url.match(/https?:\/\/([^\/]+)\/([^\/]+)\/(.+?)(\.git)?$/);
+        if (httpsMatch) {
+            host = httpsMatch[1];
+            owner = httpsMatch[2];
+            repo = httpsMatch[3].replace('.git', '');
+        } else {
+            // If we can't parse it with the regex, fallback to manual parsing
+            const parts = url.replace(/\.git$/, '').split(/[\/]/).filter(Boolean);
+            host = parts[1];
+            owner = parts[parts.length - 2] || '';
+            repo = parts[parts.length - 1] || '';
+        }
+    }
+    // Fallback for other formats
+    else {
+        const parts = url.replace(/\.git$/, '').split(/[\/:]/).filter(Boolean);
+        host = parts[0].replace(/^git@/, '');
+        owner = parts[parts.length - 2] || '';
+        repo = parts[parts.length - 1] || '';
+    }
+
+    // Normalize the host based on known patterns
+    const normalizedHost = normalizeGitHost(host);
+    
+    return {
+        host: normalizedHost,
+        owner,
+        repo
+    };
+}
+
+/**
+ * Normalize Git host names to their canonical web URLs
+ */
+function normalizeGitHost(host: string): string {
+    // Get host mappings from user settings
+    const config = vscode.workspace.getConfiguration('gitWebpageHelper');
+    const userHostMapping = config.get<Record<string, string>>('hostMapping') || {};
+    
+    // Check if there's a direct mapping in user settings
+    if (userHostMapping[host]) {
+        return userHostMapping[host];
     }
     
-    // If we can't parse it, return parts that will make a reasonable guess
-    const parts = url.replace(/\.git$/, '').split(/[\/:]/).filter(Boolean);
-    return {
-        host: parts[0].replace(/^git@/, ''),
-        owner: parts[parts.length - 2] || '',
-        repo: parts[parts.length - 1] || ''
-    };
+    // Custom host mapping for SSH configs
+    if (host.includes('github')) {
+        return 'github.com';
+    } else if (host.includes('gitlab')) {
+        return 'gitlab.com';
+    } else if (host.includes('bitbucket')) {
+        return 'bitbucket.org';
+    } else if (host.includes('azure') || host.includes('visualstudio')) {
+        // Keep Azure DevOps hosts as is since they can be custom
+        return host;
+    }
+    
+    // Return original if no match
+    return host;
 }
 
 /**
