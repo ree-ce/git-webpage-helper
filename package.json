@@ -2,7 +2,7 @@
   "name": "git-webpage-helper",
   "displayName": "Git Webpage Helper",
   "description": "Enhanced Git integration for VS Code",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "publisher": "ReeceToolkit",
   "repository": {
     "type": "git",
